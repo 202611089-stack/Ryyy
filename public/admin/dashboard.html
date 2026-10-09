@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - TechFix IT Shop</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 800;
+      display: block;
+      margin-top: 0.25rem;
+    }
+    .stat-total { color: var(--accent-blue); }
+    .stat-pending { color: var(--status-pending); }
+    .stat-confirmed { color: var(--status-confirmed); }
+
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .search-filter-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      flex: 1;
+      max-width: 600px;
+    }
+
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      background: var(--bg-card);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 850px;
+      font-size: 0.875rem;
+    }
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      background-color: var(--bg-input);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background-color: rgba(255, 255, 255, 0.02); }
+
+    .action-group {
+      display: flex;
+      gap: 0.4rem;
+    }
+    .btn-xs {
+      min-height: 32px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+    .btn-danger {
+      background-color: var(--danger-red);
+      color: #ffffff;
+    }
+    .btn-danger:hover { background-color: var(--danger-hover); }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand">
+        <span class="brand-tech">Tech</span><span class="brand-fix">Fix</span>
+        <span class="badge">Admin Dashboard</span>
+      </a>
+      <nav>
+        <a href="/" target="_blank">View Site ↗</a>
+        <button id="logout-btn" class="btn btn-secondary btn-xs">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="dash-banner" class="banner banner-danger" style="display: none;"></div>
+
+    <!-- Summary Counts -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span style="color: var(--text-muted); font-size: 0.8rem;">Total Bookings</span>
+        <strong id="count-total" class="stat-number stat-total">0</strong>
+      </div>
+      <div class="stat-card">
+        <span style="color: var(--text-muted); font-size: 0.8rem;">Pending</span>
+        <strong id="count-pending" class="stat-number stat-pending">0</strong>
+      </div>
+      <div class="stat-card">
+        <span style="color: var(--text-muted); font-size: 0.8rem;">Confirmed</span>
+        <strong id="count-confirmed" class="stat-number stat-confirmed">0</strong>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar">
+      <div class="search-filter-group">
+        <input type="text" id="search-input" placeholder="Search reference, client name, or contact..." style="flex: 2; min-width: 200px;">
+        <select id="status-filter" style="flex: 1; min-width: 130px;">
+          <option value="ALL">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <button id="refresh-btn" class="btn btn-secondary btn-xs">Refresh</button>
+    </div>
+
+    <!-- Table States -->
+    <div id="table-loading" class="state-box">
+      <p>Loading bookings data...</p>
+    </div>
+
+    <div id="table-empty" class="state-box" style="display: none;">
+      <p>No bookings yet.</p>
+    </div>
+
+    <div id="table-container" class="table-responsive" style="display: none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Service</th>
+            <th>Client Name</th>
+            <th>Contact / Email</th>
+            <th>Date & Time</th>
+            <th>Devices</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bookings-tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; School IT Department Computer Repair Activity. Admin Dashboard.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      let allBookings = [];
+
+      const loadingEl = document.getElementById("table-loading");
+      const emptyEl = document.getElementById("table-empty");
+      const tableContainer = document.getElementById("table-container");
+      const tbody = document.getElementById("bookings-tbody");
+      const bannerEl = document.getElementById("dash-banner");
+      const searchInput = document.getElementById("search-input");
+      const statusFilter = document.getElementById("status-filter");
+      const refreshBtn = document.getElementById("refresh-btn");
+      const logoutBtn = document.getElementById("logout-btn");
+
+      fetchBookings();
+
+      searchInput.addEventListener("input", filterAndRender);
+      statusFilter.addEventListener("change", filterAndRender);
+      refreshBtn.addEventListener("click", fetchBookings);
+
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          const response = await fetch("/api/admin/logout", {
+            method: "POST",
+            credentials: "same-origin"
+          });
+
+          if (response.status === 401 || response.ok) {
+            window.location.href = "/admin/login.html";
+          }
+        } catch (err) {
+          showBanner("Logout failed.", "danger");
+        }
+      });
+
+      async function fetchBookings() {
+        loadingEl.style.display = "block";
+        tableContainer.style.display = "none";
+        emptyEl.style.display = "none";
+        bannerEl.style.display = "none";
+
+        try {
+          const response = await fetch("/api/admin/bookings", {
+            credentials: "same-origin"
+          });
+
+          if (response.status === 401) {
+            window.location.href = "/admin/login.html";
+            return;
+          }
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to load bookings.");
+          }
+
+          allBookings = data;
+          updateMetrics();
+          filterAndRender();
+        } catch (err) {
+          loadingEl.style.display = "none";
+          showBanner(err.message, "danger");
+        }
+      }
+
+      function updateMetrics() {
+        document.getElementById("count-total").textContent = allBookings.length;
+        document.getElementById("count-pending").textContent = allBookings.filter(b => b.status === "pending").length;
+        document.getElementById("count-confirmed").textContent = allBookings.filter(b => b.status === "confirmed").length;
+      }
+
+      function filterAndRender() {
+        const query = searchInput.value.trim().toLowerCase();
+        const selectedStatus = statusFilter.value;
+
+        const filtered = allBookings.filter(b => {
+          const matchesStatus = selectedStatus === "ALL" || b.status === selectedStatus;
+          const matchesQuery = !query ||
+            b.reference.toLowerCase().includes(query) ||
+            b.name.toLowerCase().includes(query) ||
+            b.contact.toLowerCase().includes(query) ||
+            b.email.toLowerCase().includes(query) ||
+            (b.services && b.services.name.toLowerCase().includes(query));
+
+          return matchesStatus && matchesQuery;
+        });
+
+        loadingEl.style.display = "none";
+
+        if (filtered.length === 0) {
+          tableContainer.style.display = "none";
+          emptyEl.style.display = "block";
+          return;
+        }
+
+        emptyEl.style.display = "none";
+        tbody.innerHTML = "";
+
+        filtered.forEach(b => {
+          const tr = document.createElement("tr");
+
+          const serviceName = b.services ? escapeHtml(b.services.name) : "Custom Service";
+          const formattedDate = formatDate(b.booking_date);
+          const formattedTime = formatTime(b.booking_time);
+
+          tr.innerHTML = `
+            <td><strong>${escapeHtml(b.reference)}</strong></td>
+            <td>${serviceName}</td>
+            <td>${escapeHtml(b.name)}</td>
+            <td>
+              <div>${escapeHtml(b.contact)}</div>
+              <small style="color: var(--text-muted);">${escapeHtml(b.email)}</small>
+            </td>
+            <td>
+              <div>${formattedDate}</div>
+              <small style="color: var(--text-muted);">${formattedTime}</small>
+            </td>
+            <td>${b.guests}</td>
+            <td><span class="badge-status status-${b.status}">${b.status.toUpperCase()}</span></td>
+            <td>
+              <div class="action-group">
+                <button class="btn btn-primary btn-xs" onclick="updateStatus(${b.id}, 'confirm')" ${b.status === "confirmed" ? "disabled" : ""}>Confirm</button>
+                <button class="btn btn-secondary btn-xs" onclick="updateStatus(${b.id}, 'cancel')" ${b.status === "cancelled" ? "disabled" : ""}>Cancel</button>
+                <button class="btn btn-danger btn-xs" onclick="deleteBooking(${b.id}, '${escapeHtml(b.reference)}')">Delete</button>
+              </div>
+            </td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+
+        tableContainer.style.display = "block";
+      }
+
+      window.updateStatus = async (id, action) => {
+        try {
+          const res = await fetch(`/api/admin/bookings/${id}/${action}`, {
+            method: "PATCH",
+            credentials: "same-origin"
+          });
+
+          if (res.status === 401) {
+            window.location.href = "/admin/login.html";
+            return;
+          }
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || `Failed to ${action} booking.`);
+
+          showBanner(`Booking reference updated to ${action}ed.`, "success");
+          fetchBookings();
+        } catch (err) {
+          showBanner(err.message, "danger");
+        }
+      };
+
+      window.deleteBooking = async (id, reference) => {
+        if (!confirm(`Are you sure you want to permanently delete booking ${reference}?`)) {
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/admin/bookings/${id}`, {
+            method: "DELETE",
+            credentials: "same-origin"
+          });
+
+          if (res.status === 401) {
+            window.location.href = "/admin/login.html";
+            return;
+          }
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to delete booking.");
+
+          showBanner(`Booking ${reference} deleted successfully.`, "success");
+          fetchBookings();
+        } catch (err) {
+          showBanner(err.message, "danger");
+        }
+      };
+
+      function showBanner(msg, type) {
+        bannerEl.textContent = msg;
+        bannerEl.className = `banner banner-${type}`;
+        bannerEl.style.display = "block";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function formatDate(dateStr) {
+        const date = new Date(dateStr + "T00:00:00");
+        return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function formatTime(timeStr) {
+        const [hours, minutes] = timeStr.split(":");
+        let h = parseInt(hours, 10);
+        const period = h >= 12 ? "PM" : "AM";
+        h = h % 12 === 0 ? 12 : h % 12;
+        return `${h}:${minutes} ${period}`;
+      }
+    });
+  </script>
+</body>
+</html>

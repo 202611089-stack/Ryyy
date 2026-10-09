@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechFix Repair Shop - IT Department Services</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand">
+        <span class="brand-tech">Tech</span><span class="brand-fix">Fix</span>
+        <span class="badge">IT Dept</span>
+      </a>
+      <nav>
+        <a href="/" class="active">Services</a>
+        <a href="/booking.html">Book Now</a>
+        <a href="/status.html">Check Status</a>
+        <a href="/admin/">Admin Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>School IT Department Computer Repair</h1>
+      <p>Fast, reliable hardware, software, and optimization services by IT student technicians.</p>
+    </section>
+
+    <div id="banner-message" class="banner banner-danger" style="display: none;"></div>
+
+    <div id="services-loading" class="state-box">
+      <p>Loading available services...</p>
+    </div>
+
+    <div id="services-empty" class="state-box" style="display: none;">
+      <p>No repair services are currently available. Please check back later.</p>
+    </div>
+
+    <div id="services-grid" class="grid-cards" style="display: none;"></div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; School IT Department Computer Repair Activity. All prices in Philippine Pesos (₱).</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const loadingEl = document.getElementById("services-loading");
+      const emptyEl = document.getElementById("services-empty");
+      const gridEl = document.getElementById("services-grid");
+      const bannerEl = document.getElementById("banner-message");
+
+      try {
+        const response = await fetch("/api/services");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load repair services.");
+        }
+
+        loadingEl.style.display = "none";
+
+        if (!data || data.length === 0) {
+          emptyEl.style.display = "block";
+          return;
+        }
+
+        gridEl.innerHTML = "";
+        data.forEach(service => {
+          const card = document.createElement("div");
+          card.className = "card service-card";
+
+          const formattedPrice = `₱${Number(service.price).toLocaleString("en-PH", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}`;
+
+          card.innerHTML = `
+            <div>
+              <h3>${escapeHtml(service.name)}</h3>
+              <p>${escapeHtml(service.description)}</p>
+            </div>
+            <div class="service-footer">
+              <span class="price">${formattedPrice}</span>
+              <a href="/booking.html?serviceId=${service.id}" class="btn btn-primary">Book Now</a>
+            </div>
+          `;
+          gridEl.appendChild(card);
+        });
+
+        gridEl.style.display = "grid";
+      } catch (err) {
+        loadingEl.style.display = "none";
+        bannerEl.textContent = err.message;
+        bannerEl.style.display = "block";
+      }
+    });
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>

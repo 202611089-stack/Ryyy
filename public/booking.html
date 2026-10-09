@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book a Repair Service - TechFix IT Shop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand">
+        <span class="brand-tech">Tech</span><span class="brand-fix">Fix</span>
+        <span class="badge">IT Dept</span>
+      </a>
+      <nav>
+        <a href="/">Services</a>
+        <a href="/booking.html" class="active">Book Now</a>
+        <a href="/admin/">Admin Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="form-card">
+      <h2>Schedule Your Computer Repair</h2>
+      <p class="subtitle">Fill in the details below to lock in your appointment with our IT technicians.</p>
+
+      <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+
+      <form id="booking-form">
+        <div class="form-group">
+          <label for="service_id">Select Service *</label>
+          <select id="service_id" name="service_id" required>
+            <option value="" disabled selected>Loading available services...</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Full Name *</label>
+            <input type="text" id="name" name="name" placeholder="e.g. Juan dela Cruz" required>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address *</label>
+            <input type="email" id="email" name="email" placeholder="e.g. juan@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="contact">Contact Number *</label>
+            <input type="tel" id="contact" name="contact" placeholder="e.g. 09171234567" required>
+          </div>
+
+          <div class="form-group">
+            <label for="guests">Number of Devices/Items *</label>
+            <input type="number" id="guests" name="guests" min="1" max="10" value="1" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="booking_date">Preferred Date *</label>
+            <input type="date" id="booking_date" name="booking_date" required>
+          </div>
+
+          <div class="form-group">
+            <label for="booking_time">Preferred Time *</label>
+            <input type="time" id="booking_time" name="booking_time" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Issue Description / Additional Notes</label>
+          <textarea id="notes" name="notes" rows="4" placeholder="Describe the problem (e.g. PC won't turn on, blue screen, loud fan sound)..."></textarea>
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Confirm & Submit Booking</button>
+      </form>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; School IT Department Repair Shop Activity. All prices in Philippine Pesos (₱).</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const serviceSelect = document.getElementById("service_id");
+      const bookingForm = document.getElementById("booking-form");
+      const errorMsg = document.getElementById("error-message");
+      const submitBtn = document.getElementById("submit-btn");
+
+      // Set minimum date to today
+      const dateInput = document.getElementById("booking_date");
+      const today = new Date().toISOString().split("T")[0];
+      dateInput.min = today;
+
+      // Auto-select service if passed in URL query param (?serviceId=X)
+      const urlParams = new URLSearchParams(window.location.search);
+      const preselectedServiceId = urlParams.get("serviceId");
+
+      // Fetch active services from API
+      try {
+        const response = await fetch("/api/services");
+        if (!response.ok) throw new Error("Failed to load services");
+        const services = await response.json();
+
+        serviceSelect.innerHTML = '<option value="" disabled selected>Select a service...</option>';
+        services.forEach(service => {
+          const option = document.createElement("option");
+          option.value = service.id;
+          option.textContent = `${service.name} - ₱${Number(service.price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+          if (preselectedServiceId && service.id == preselectedServiceId) {
+            option.selected = true;
+          }
+          serviceSelect.appendChild(option);
+        });
+      } catch (err) {
+        errorMsg.textContent = "Could not load available services. Please try refreshing.";
+        errorMsg.style.display = "block";
+      }
+
+      // Handle booking submission
+      bookingForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errorMsg.style.display = "none";
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Processing Booking...";
+
+        const payload = {
+          service_id: parseInt(document.getElementById("service_id").value),
+          name: document.getElementById("name").value.trim(),
+          email: document.getElementById("email").value.trim(),
+          contact: document.getElementById("contact").value.trim(),
+          guests: parseInt(document.getElementById("guests").value) || 1,
+          booking_date: document.getElementById("booking_date").value,
+          booking_time: document.getElementById("booking_time").value,
+          notes: document.getElementById("notes").value.trim()
+        };
+
+        try {
+          const res = await fetch("/api/bookings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || "Failed to place booking.");
+          }
+
+          // Redirect to confirmation page with reference number
+          window.location.href = `/confirmation.html?ref=${encodeURIComponent(data.reference)}`;
+        } catch (err) {
+          errorMsg.textContent = err.message;
+          errorMsg.style.display = "block";
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Confirm & Submit Booking";
+        }
+      });
+    });
+  </script>
+</body>
+</html>

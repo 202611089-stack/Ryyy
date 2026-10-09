@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - School IT Repair Shop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="logo-area">
+      <span class="logo-icon">📊</span>
+      <h1>Admin Dashboard</h1>
+    </div>
+    <nav>
+      <span id="admin-user-display" style="color: var(--accent-green); margin-right: 1rem; font-weight: 600;"></span>
+      <a href="#" onclick="logoutAdmin()">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+      <h2>Repair Bookings Management</h2>
+      <button class="btn btn-secondary" onclick="loadAdminBookings()">Refresh Data</button>
+    </div>
+
+    <div id="admin-alert"></div>
+
+    <div class="card" style="overflow-x: auto; padding: 1rem;">
+      <table id="bookings-table">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Client</th>
+            <th>Service</th>
+            <th>Schedule</th>
+            <th>Units</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bookings-tbody">
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--text-muted);">Loading bookings...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 School IT Department Repair Shop. Admin Portal.</p>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      await verifyAdminSession();
+      await loadAdminBookings();
+    });
+
+    async function verifyAdminSession() {
+      try {
+        const response = await fetch("/api/admin/verify");
+        if (!response.ok) {
+          window.location.href = "/admin/login.html";
+          return;
+        }
+        const data = await response.json();
+        document.getElementById("admin-user-display").textContent = `👤 ${data.admin}`;
+      } catch (err) {
+        window.location.href = "/admin/login.html";
+      }
+    }
+
+    async function loadAdminBookings() {
+      const tbody = document.getElementById("bookings-tbody");
+      const alertBox = document.getElementById("admin-alert");
+      alertBox.innerHTML = "";
+
+      try {
+        const response = await fetch("/api/admin/bookings");
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            window.location.href = "/admin/login.html";
+            return;
+          }
+          throw new Error("Failed to load bookings");
+        }
+
+        const bookings = await response.json();
+
+        if (bookings.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No repair bookings found in the database.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = bookings.map(b => `
+          <tr>
+            <td><strong>${escapeHtml(b.reference)}</strong></td>
+            <td>
+              ${escapeHtml(b.name)}<br>
+              <small style="color: var(--text-muted);">${escapeHtml(b.contact)}</small>
+            </td>
+            <td>${escapeHtml(b.services?.name || "Service")}</td>
+            <td>${b.booking_date} <br><small style="color: var(--text-muted);">${b.booking_time}</small></td>
+            <td>${b.guests}</td>
+            <td><span class="badge badge-${b.status}">${b.status}</span></td>
+            <td>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                ${b.status !== "confirmed" ? `<button class="btn btn-success" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="updateStatus(${b.id}, 'confirmed')">Confirm</button>` : ""}
+                ${b.status !== "cancelled" ? `<button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="updateStatus(${b.id}, 'cancelled')">Cancel</button>` : ""}
+                <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="deleteBooking(${b.id})">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+
+      } catch (err) {
+        alertBox.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function updateStatus(id, status) {
+      try {
+        const response = await fetch(`/api/admin/bookings/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to update status");
+
+        await loadAdminBookings();
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    async function deleteBooking(id) {
+      if (!confirm("Are you sure you want to delete this booking record?")) return;
+
+      try {
+        const response = await fetch(`/api/admin/bookings/${id}`, {
+          method: "DELETE"
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to delete booking");
+
+        await loadAdminBookings();
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    async function logoutAdmin() {
+      try {
+        await fetch("/api/admin/post/logout" || "/api/admin/logout", { method: "POST" });
+      } catch (e) {}
+      window.location.href = "/admin/login.html";
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>

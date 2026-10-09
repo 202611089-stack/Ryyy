@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmation - TechFix IT Shop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand">
+        <span class="brand-tech">Tech</span><span class="brand-fix">Fix</span>
+        <span class="badge">IT Dept</span>
+      </a>
+      <nav>
+        <a href="/">Services</a>
+        <a href="/booking.html">Book Now</a>
+        <a href="/status.html">Check Status</a>
+        <a href="/admin/">Admin Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="loading-state" class="state-box">
+      <p>Retrieving booking details...</p>
+    </div>
+
+    <div id="error-state" class="state-box" style="display: none;">
+      <h2 style="color: var(--danger-red); margin-bottom: 0.5rem;">Booking Not Found</h2>
+      <p id="error-msg" style="margin-bottom: 1.5rem;"></p>
+      <a href="/booking.html" class="btn btn-primary">Make a New Booking</a>
+    </div>
+
+    <div id="confirmation-content" style="display: none; max-width: 650px; margin: 0 auto;">
+      <div id="copy-toast" class="banner banner-success" style="display: none;">
+        Reference code copied to clipboard!
+      </div>
+
+      <div class="reference-card">
+        <p style="font-size: 0.9rem; color: var(--text-muted);">Booking Reference Code</p>
+        <strong id="ref-code-display" class="ref-code">------</strong>
+        <button id="copy-btn" class="btn btn-secondary copy-btn">Copy Code</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+          Appointment Summary
+        </h3>
+
+        <div class="details-list">
+          <div class="detail-item">
+            <span>Service</span>
+            <strong id="detail-service">--</strong>
+          </div>
+          <div class="detail-item">
+            <span>Estimated Fee</span>
+            <strong id="detail-price" style="color: var(--primary-green);">₱0.00</strong>
+          </div>
+          <div class="detail-item">
+            <span>Client Name</span>
+            <strong id="detail-name">--</strong>
+          </div>
+          <div class="detail-item">
+            <span>Status</span>
+            <strong><span id="detail-status" class="badge-status">--</span></strong>
+          </div>
+          <div class="detail-item">
+            <span>Date</span>
+            <strong id="detail-date">--</strong>
+          </div>
+          <div class="detail-item">
+            <span>Time Slot</span>
+            <strong id="detail-time">--</strong>
+          </div>
+          <div class="detail-item">
+            <span>Contact Number</span>
+            <strong id="detail-contact">--</strong>
+          </div>
+          <div class="detail-item">
+            <span>Email</span>
+            <strong id="detail-email">--</strong>
+          </div>
+          <div class="detail-item" style="grid-column: 1 / -1;">
+            <span>Devices/Items</span>
+            <strong id="detail-guests">1</strong>
+          </div>
+          <div class="detail-item" id="notes-item" style="grid-column: 1 / -1; display: none;">
+            <span>Reported Notes / Issue</span>
+            <strong id="detail-notes" style="font-weight: normal; color: var(--text-muted);">--</strong>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="/" class="btn btn-primary" style="flex: 1;">Return to Home</a>
+          <button onclick="window.print()" class="btn btn-secondary">Print Details</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; School IT Department Computer Repair Activity. All prices in Philippine Pesos (₱).</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const loadingState = document.getElementById("loading-state");
+      const errorState = document.getElementById("error-state");
+      const confirmationContent = document.getElementById("confirmation-content");
+      const refDisplay = document.getElementById("ref-code-display");
+      const copyBtn = document.getElementById("copy-btn");
+      const copyToast = document.getElementById("copy-toast");
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const reference = urlParams.get("ref");
+
+      if (!reference) {
+        loadingState.style.display = "none";
+        document.getElementById("error-msg").textContent = "No reference code provided in the URL.";
+        errorState.style.display = "block";
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/bookings/${encodeURIComponent(reference)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Could not find booking.");
+        }
+
+        loadingState.style.display = "none";
+        confirmationContent.style.display = "block";
+
+        refDisplay.textContent = data.reference;
+
+        document.getElementById("detail-service").textContent = data.services ? data.services.name : "Computer Repair";
+        document.getElementById("detail-price").textContent = data.services 
+          ? `₱${Number(data.services.price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` 
+          : "₱0.00";
+        document.getElementById("detail-name").textContent = data.name;
+        document.getElementById("detail-date").textContent = formatDate(data.booking_date);
+        document.getElementById("detail-time").textContent = formatTime(data.booking_time);
+        document.getElementById("detail-contact").textContent = data.contact;
+        document.getElementById("detail-email").textContent = data.email;
+        document.getElementById("detail-guests").textContent = data.guests;
+
+        const statusEl = document.getElementById("detail-status");
+        statusEl.textContent = data.status.toUpperCase();
+        statusEl.className = `badge-status status-${data.status.toLowerCase()}`;
+
+        if (data.notes) {
+          document.getElementById("detail-notes").textContent = data.notes;
+          document.getElementById("notes-item").style.display = "block";
+        }
+
+        // Copy button handler
+        copyBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(data.reference).then(() => {
+            copyToast.style.display = "block";
+            setTimeout(() => { copyToast.style.display = "none"; }, 3000);
+          });
+        });
+
+      } catch (err) {
+        loadingState.style.display = "none";
+        document.getElementById("error-msg").textContent = err.message;
+        errorState.style.display = "block";
+      }
+    });
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr + "T00:00:00");
+      return date.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+    }
+
+    function formatTime(timeStr) {
+      const [hours, minutes] = timeStr.split(":");
+      let h = parseInt(hours, 10);
+      const period = h >= 12 ? "PM" : "AM";
+      h = h % 12 === 0 ? 12 : h % 12;
+      return `${h}:${minutes} ${period}`;
+    }
+  </script>
+</body>
+</html>

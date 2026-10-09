@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check Booking Status - TechFix IT Shop</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="/" class="brand">
+        <span class="brand-tech">Tech</span><span class="brand-fix">Fix</span>
+        <span class="badge">IT Dept</span>
+      </a>
+      <nav>
+        <a href="/">Services</a>
+        <a href="/booking.html">Book Now</a>
+        <a href="/status.html" class="active">Check Status</a>
+        <a href="/admin/">Admin Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card form-card">
+      <h2>Check Booking Status</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">Enter your reference code (e.g., BK123456) to look up your appointment details.</p>
+
+      <form id="status-form" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <label for="reference" class="sr-only" style="display:none;">Reference Number</label>
+          <input type="text" id="reference" name="reference" placeholder="Enter Reference Code" required style="text-transform: uppercase;">
+        </div>
+        <button type="submit" id="search-btn" class="btn btn-primary">Search</button>
+      </form>
+
+      <div id="status-banner" class="banner banner-danger" style="display: none; margin-top: 1rem;"></div>
+    </div>
+
+    <div id="result-loading" class="state-box" style="display: none;">
+      <p>Looking up reference code...</p>
+    </div>
+
+    <div id="result-card" class="card" style="display: none; max-width: 650px; margin: 1.5rem auto 0 auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+        <h3 id="res-ref">Reference: ------</h3>
+        <span id="res-status" class="badge-status">--</span>
+      </div>
+
+      <div class="details-list">
+        <div class="detail-item">
+          <span>Service Name</span>
+          <strong id="res-service">--</strong>
+        </div>
+        <div class="detail-item">
+          <span>Price</span>
+          <strong id="res-price" style="color: var(--primary-green);">₱0.00</strong>
+        </div>
+        <div class="detail-item">
+          <span>Client Name</span>
+          <strong id="res-name">--</strong>
+        </div>
+        <div class="detail-item">
+          <span>Devices/Items</span>
+          <strong id="res-guests">1</strong>
+        </div>
+        <div class="detail-item">
+          <span>Date</span>
+          <strong id="res-date">--</strong>
+        </div>
+        <div class="detail-item">
+          <span>Time Slot</span>
+          <strong id="res-time">--</strong>
+        </div>
+        <div class="detail-item">
+          <span>Contact Number</span>
+          <strong id="res-contact">--</strong>
+        </div>
+        <div class="detail-item">
+          <span>Email</span>
+          <strong id="res-email">--</strong>
+        </div>
+        <div class="detail-item" id="res-notes-item" style="grid-column: 1 / -1; display: none;">
+          <span>Reported Issue / Notes</span>
+          <strong id="res-notes" style="font-weight: normal; color: var(--text-muted);">--</strong>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; School IT Department Computer Repair Activity. All prices in Philippine Pesos (₱).</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("status-form");
+      const refInput = document.getElementById("reference");
+      const searchBtn = document.getElementById("search-btn");
+      const bannerEl = document.getElementById("status-banner");
+      const loadingEl = document.getElementById("result-loading");
+      const resultCard = document.getElementById("result-card");
+
+      // Auto-search if ref passed in URL query param
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRef = urlParams.get("ref");
+      if (urlRef) {
+        refInput.value = urlRef;
+        fetchStatus(urlRef);
+      }
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const refVal = refInput.value.trim().toUpperCase();
+        if (refVal) fetchStatus(refVal);
+      });
+
+      async function fetchStatus(refCode) {
+        bannerEl.style.display = "none";
+        resultCard.style.display = "none";
+        loadingEl.style.display = "block";
+        searchBtn.disabled = true;
+
+        try {
+          const response = await fetch(`/api/bookings/${encodeURIComponent(refCode)}`);
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Booking reference not found.");
+          }
+
+          loadingEl.style.display = "none";
+          searchBtn.disabled = false;
+
+          document.getElementById("res-ref").textContent = `Reference: ${data.reference}`;
+          document.getElementById("res-service").textContent = data.services ? data.services.name : "Custom Repair Service";
+          document.getElementById("res-price").textContent = data.services 
+            ? `₱${Number(data.services.price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` 
+            : "₱0.00";
+          document.getElementById("res-name").textContent = data.name;
+          document.getElementById("res-guests").textContent = data.guests;
+          document.getElementById("res-date").textContent = formatDate(data.booking_date);
+          document.getElementById("res-time").textContent = formatTime(data.booking_time);
+          document.getElementById("res-contact").textContent = data.contact;
+          document.getElementById("res-email").textContent = data.email;
+
+          const statusEl = document.getElementById("res-status");
+          statusEl.textContent = data.status.toUpperCase();
+          statusEl.className = `badge-status status-${data.status.toLowerCase()}`;
+
+          if (data.notes) {
+            document.getElementById("res-notes").textContent = data.notes;
+            document.getElementById("res-notes-item").style.display = "block";
+          } else {
+            document.getElementById("res-notes-item").style.display = "none";
+          }
+
+          resultCard.style.display = "block";
+        } catch (err) {
+          loadingEl.style.display = "none";
+          searchBtn.disabled = false;
+          bannerEl.textContent = err.message;
+          bannerEl.style.display = "block";
+        }
+      }
+
+      function formatDate(dateStr) {
+        const date = new Date(dateStr + "T00:00:00");
+        return date.toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+      }
+
+      function formatTime(timeStr) {
+        const [hours, minutes] = timeStr.split(":");
+        let h = parseInt(hours, 10);
+        const period = h >= 12 ? "PM" : "AM";
+        h = h % 12 === 0 ? 12 : h % 12;
+        return `${h}:${minutes} ${period}`;
+      }
+    });
+  </script>
+</body>
+</html>
